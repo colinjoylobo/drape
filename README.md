@@ -7,8 +7,6 @@ would actually publish: the real garment, on a consistent model, posed and lit f
 colour, print and construction held to the reference rather than reinterpreted. Every shot is judged
 against the source photographs before you see it.
 
-<!-- screenshots -->
-
 ## Why it is built this way
 
 A model asked to "dress her in this" will happily produce something *similar* to the garment. Similar
