@@ -42,7 +42,7 @@ def serve_file(path: str):
 
     Uploads keep their original location on disk rather than being copied into the
     app, so the frontend needs to read arbitrary paths. Restricted to files under
-    storage or the user's G5 tree, so a stray path cannot walk the filesystem.
+    storage or an explicitly configured root, so a stray path cannot walk the filesystem.
     """
     p = Path(path).resolve()
     allowed_roots = [STORAGE_DIR.resolve()]

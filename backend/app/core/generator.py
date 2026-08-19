@@ -1,11 +1,10 @@
 """
-Image generation, pinned to the Servicing org.
+Image generation.
 
-Routing is fixed here rather than passed in per request. The org header alone is
-not sufficient: the session must be bound to a Labs project entity, which is what
-satisfies the backend's tool-access check for an org whose standalone Model Garden
-toggle is off. Splitting those two apart would produce confusing 403s, so they are
-set together and are not parameters.
+The provider account and session are fixed here rather than passed per request,
+and the two are set together: the account header alone is not sufficient, because
+the session must also belong to that account. Splitting them apart produces
+confusing authorisation failures.
 """
 import io
 import sys
@@ -14,8 +13,8 @@ from typing import Any, Dict, List, Optional
 
 from PIL import Image, ImageOps
 
-from ..config import (API_UTILS, DEFAULT_IMAGE_SIZE, SERVICING_ORG_ID,
-                      SERVICING_TASK_SESSION_ID)
+from ..config import (API_UTILS, DEFAULT_IMAGE_SIZE, PROVIDER_ORG_ID,
+                      PROVIDER_SESSION_ID)
 
 if API_UTILS:
     sys.path.insert(0, str(API_UTILS))
@@ -23,9 +22,8 @@ try:
     from nanobanana_fallback import NanoBananaFallback  # noqa: E402
 except ImportError as e:  # pragma: no cover - configuration error, not a code path
     raise ImportError(
-        "Could not import nanobanana_fallback, which provides the model-garden "
-        "client. Set DRAPE_SHARED_UTILS to the directory containing it "
-        "(see backend/.env.example)."
+        "Could not import the shared generation client module. Set "
+        "DRAPE_SHARED_UTILS to the directory containing it (see .env.example)."
     ) from e
 
 SEEDREAM_MODEL = "bytedance/seedream-v5-pro-edit"
@@ -33,14 +31,14 @@ IMAGE_SIZES = ["portrait_4_3", "auto_1K", "auto_2K", "square_hd"]
 
 
 class DrapeClient(NanoBananaFallback):
-    """Seedream multi-reference edit, always through the Servicing org."""
+    """Seedream multi-reference edit, always through the configured account."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._org_headers = {"X-Organization-Id": SERVICING_ORG_ID}
-        self._session_id = SERVICING_TASK_SESSION_ID
+        self._org_headers = {"X-Organization-Id": PROVIDER_ORG_ID}
+        self._session_id = PROVIDER_SESSION_ID
 
-        # The inherited client builds its own requests too; wrap it so the org
+        # The inherited client builds its own requests too; wrap it so the account
         # header cannot be lost on a code path we did not override.
         original = self.token_manager.make_request
 

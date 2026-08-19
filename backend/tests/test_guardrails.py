@@ -619,14 +619,14 @@ class TestPersistence:
 # ==========================================================================
 class TestConfig:
     def test_no_capability_is_committed_to_source(self):
-        """The servicing session ID grants credit spend, so it must come from the
-        environment. Detected structurally rather than by listing the real values —
+        """The provider session id grants credit spend, so it must come from the
+        environment. Detected structurally rather than by listing real values —
         naming them here would put them back in the repo this test exists to keep
         them out of."""
         import re
         source = (Path(__file__).resolve().parents[1] / "app" / "config.py").read_text()
-        for name in ("SERVICING_ORG_ID", "SERVICING_PROJECT_ID",
-                     "SERVICING_TASK_ENTITY_ID", "SERVICING_TASK_SESSION_ID"):
+        for name in ("PROVIDER_ORG_ID", "PROVIDER_PROJECT_ID",
+                     "PROVIDER_ENTITY_ID", "PROVIDER_SESSION_ID"):
             assignment = re.search(rf"^{name}\s*=\s*(.+)$", source, re.MULTILINE)
             assert assignment, f"{name} not found in config"
             value = assignment.group(1)

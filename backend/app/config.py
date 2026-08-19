@@ -1,11 +1,9 @@
 """
 Drape configuration.
 
-Generation routing is NOT user-configurable. Every model-garden call Drape makes
-is pinned to the Servicing org via a project-entity-bound session — that binding
-is also what bypasses the org's disabled standalone Model Garden toggle, so it is
-load-bearing for access, not just for billing. Do not expose these as request
-parameters or environment overrides.
+Generation routing is fixed, not a request parameter. The provider account and
+session a generation runs under are set once here and read from the environment,
+so a request cannot redirect where work is billed.
 """
 import os
 from pathlib import Path
@@ -40,26 +38,22 @@ if _extra_env:
 # app work on exactly one machine and bakes the author's directory layout into a
 # shared repository.
 #
-# DRAPE_SHARED_UTILS holds nanobanana_fallback.py, the model-garden client this
-# app builds on. DRAPE_ALLOWED_ROOT is an extra directory the file server may read
-# images from, so garments can be referenced where they already sit rather than
-# copied into the app.
+# DRAPE_SHARED_UTILS holds the shared generation client module this app builds on.
+# DRAPE_ALLOWED_ROOT is an extra directory the file server may read images from, so
+# garments can be referenced where they already sit rather than copied into the app.
 API_UTILS = Path(os.environ["DRAPE_SHARED_UTILS"]).expanduser() \
     if os.getenv("DRAPE_SHARED_UTILS") else None
 ALLOWED_ROOT = Path(os.environ["DRAPE_ALLOWED_ROOT"]).expanduser() \
     if os.getenv("DRAPE_ALLOWED_ROOT") else None
 
-# --- Generation routing ------------------------------------------------------
-# Read from the environment, never committed. SERVICING_TASK_SESSION_ID in
-# particular is a capability, not a label: it is the project-entity binding that
-# satisfies the backend's tool-access check for an org whose standalone Model
-# Garden toggle is off. Anyone holding it can spend that org's credits, so it must
-# not live in source control. Put these in backend/.env (gitignored); see
-# .env.example.
-SERVICING_ORG_ID = os.getenv("DRAPE_SERVICING_ORG_ID", "")
-SERVICING_PROJECT_ID = os.getenv("DRAPE_SERVICING_PROJECT_ID", "")
-SERVICING_TASK_ENTITY_ID = os.getenv("DRAPE_SERVICING_TASK_ENTITY_ID", "")
-SERVICING_TASK_SESSION_ID = os.getenv("DRAPE_SERVICING_TASK_SESSION_ID", "")
+# --- Generation provider ------------------------------------------------------
+# Read from the environment, never committed. The session id is a capability
+# rather than a label — anyone holding it can spend the associated account's
+# credits — so it belongs in backend/.env (gitignored). See .env.example.
+PROVIDER_ORG_ID = os.getenv("DRAPE_PROVIDER_ORG_ID", "")
+PROVIDER_PROJECT_ID = os.getenv("DRAPE_PROVIDER_PROJECT_ID", "")
+PROVIDER_ENTITY_ID = os.getenv("DRAPE_PROVIDER_ENTITY_ID", "")
+PROVIDER_SESSION_ID = os.getenv("DRAPE_PROVIDER_SESSION_ID", "")
 
 # --- Vision (analysis + QC) ---------------------------------------------------
 # GEMINI_API_KEY_AISTUDIO first: the plain key is on a free tier that rate-limits
@@ -97,8 +91,8 @@ def missing_credentials() -> list:
         "access_token": os.getenv("access_token"),
         "refresh_token": os.getenv("refresh_token"),
         "access_key": os.getenv("access_key"),
-        "DRAPE_SERVICING_ORG_ID": SERVICING_ORG_ID,
-        "DRAPE_SERVICING_TASK_SESSION_ID": SERVICING_TASK_SESSION_ID,
+        "DRAPE_PROVIDER_ORG_ID": PROVIDER_ORG_ID,
+        "DRAPE_PROVIDER_SESSION_ID": PROVIDER_SESSION_ID,
     }
     missing = [name for name, value in required.items() if not value]
     if not GEMINI_API_KEY_PRESENT:
