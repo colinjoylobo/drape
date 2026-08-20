@@ -28,6 +28,23 @@ return. Almost every decision below follows from that.
 - **Nothing regenerates on its own.** Generation is the only expensive step, so batches skip finished
   work, prompt preview is free, and repairs are user-approved.
 
+## Sample data
+
+The repository ships with a worked shoot — models, garments, analyses, looks, finished shots and QC
+verdicts — so a clone opens onto real work rather than an empty screen.
+
+After cloning, point the bundled database at your checkout:
+
+```bash
+cd backend && ./.venv/bin/python rebase_paths.py
+```
+
+Image paths are stored absolute, so without this they still name the machine the data was created
+on. The script is idempotent and safe to re-run after moving the checkout.
+
+Source photography is downscaled to 2000px on the long edge — enough to see the app work and to
+regenerate from, without carrying camera-resolution originals in git. Generated shots are unmodified.
+
 ## Getting started
 
 ```bash

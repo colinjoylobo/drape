@@ -2,8 +2,12 @@
 backend/.env
 .env
 
-# Local data: database, generated images, uploads, crops
-backend/storage/
+# Sample data IS committed so a clone has something to work with. Excluded:
+# SQLite sidecar files (transient) and the crop cache (derived, and keyed on
+# source path, so it regenerates itself).
+backend/storage/drape.db-wal
+backend/storage/drape.db-shm
+backend/storage/crops/
 
 # Environments and build output
 backend/.venv/
