@@ -367,3 +367,8 @@ pre.prompt {
 .pick:focus-visible { opacity: 1; outline: 2px solid var(--accent); }
 .tile.picked { border-color: var(--accent); }
 .tile.picked .pick { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+/* Destructive confirmation: solid, so it reads differently from every other
+   button in the app rather than relying on colour alone. */
+.btn.danger-solid { background: var(--bad); color: #fff; }
+.btn.danger-solid:hover { opacity: 0.9; }

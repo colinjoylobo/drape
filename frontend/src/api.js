@@ -35,6 +35,7 @@ export const api = {
   sessionShots: (id) => get(`/sessions/${id}/shots`),
   sessionProgress: (id) => get(`/sessions/${id}/progress`),
   updateSession: (id, body) => patch(`/sessions/${id}`, body),
+  deletionPreview: (id) => get(`/sessions/${id}/deletion-preview`),
   deleteSession: (id) => del(`/sessions/${id}`),
   importFolder: (id, root, category) =>
     post(`/sessions/${id}/import-folder?root=${encodeURIComponent(root)}` +

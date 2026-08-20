@@ -158,11 +158,89 @@ def update_session(session_id: int, payload: SessionUpdate):
             "SELECT * FROM sessions WHERE id=?", (session_id,)).fetchone())
 
 
-@router.delete("/{session_id}")
-def delete_session(session_id: int):
+def _session_files(conn, session_id: int) -> dict:
+    """Files this session owns, and would therefore lose on deletion.
+
+    Source photography is reference-counted: the bundled sample data is shared,
+    and deleting one session must not pull images out from under another.
+    Avatars are never included — they are persistent by design and outlive every
+    session that used them.
+    """
+    outputs = [r["output_path"] for r in conn.execute(
+        """SELECT g.output_path FROM generations g
+           JOIN garments gar ON gar.id = g.garment_id
+           WHERE gar.session_id=? AND g.output_path IS NOT NULL""", (session_id,)).fetchall()]
+
+    mine = {r["path"] for r in conn.execute(
+        """SELECT i.path FROM garment_images i
+           JOIN garments g ON g.id = i.garment_id
+           WHERE g.session_id=?""", (session_id,)).fetchall()}
+    shared = {r["path"] for r in conn.execute(
+        """SELECT i.path FROM garment_images i
+           JOIN garments g ON g.id = i.garment_id
+           WHERE g.session_id!=?""", (session_id,)).fetchall()}
+    sources = sorted(mine - shared)
+
+    upload_dir = UPLOAD_DIR / f"session_{session_id}"
+    return {"outputs": outputs, "sources": sources,
+            "upload_dir": str(upload_dir) if upload_dir.exists() else None}
+
+
+@router.get("/{session_id}/deletion-preview")
+def deletion_preview(session_id: int):
+    """What deleting this session would destroy. Generated shots cost credits, so
+    the number is shown before the button is pressed rather than after."""
     with get_db() as conn:
+        session = row_to_dict(conn.execute(
+            "SELECT * FROM sessions WHERE id=?", (session_id,)).fetchone())
+        if not session:
+            raise HTTPException(404, "session not found")
+        counts = conn.execute(
+            """SELECT
+                 (SELECT COUNT(*) FROM garments WHERE session_id=?) garments,
+                 (SELECT COUNT(*) FROM generations g JOIN garments gar ON gar.id=g.garment_id
+                   WHERE gar.session_id=? AND g.status='done') shots,
+                 (SELECT COUNT(*) FROM looks l JOIN garments gar ON gar.id=l.garment_id
+                   WHERE gar.session_id=?) looks""", (session_id,) * 3).fetchone()
+        files = _session_files(conn, session_id)
+
+    paths = [p for p in files["outputs"] + files["sources"] if p]
+    size = sum(Path(p).stat().st_size for p in paths if Path(p).exists())
+    return {"name": session["name"], "garments": counts["garments"],
+            "shots": counts["shots"], "looks": counts["looks"],
+            "files": len(paths), "bytes": size,
+            # Named so the UI can say what survives: these are the things people
+            # worry about losing and they are not touched.
+            "kept": ["models", "saved looks", "learned lessons"]}
+
+
+@router.delete("/{session_id}")
+def delete_session(session_id: int, delete_files: bool = True):
+    """Delete a session and everything scoped to it.
+
+    Rows cascade. Files are removed too unless `delete_files=false`, because
+    otherwise storage grows forever with images nothing references. Models, look
+    templates and lessons are persistent and survive.
+    """
+    with get_db() as conn:
+        if not conn.execute("SELECT 1 FROM sessions WHERE id=?", (session_id,)).fetchone():
+            raise HTTPException(404, "session not found")
+        files = _session_files(conn, session_id) if delete_files else None
         conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
-    return {"deleted": session_id}
+
+    removed = 0
+    if files:
+        for path in files["outputs"] + files["sources"]:
+            try:
+                if path and Path(path).is_file():
+                    Path(path).unlink()
+                    removed += 1
+            except OSError:
+                pass          # a file we cannot remove must not fail the delete
+        if files["upload_dir"]:
+            shutil.rmtree(files["upload_dir"], ignore_errors=True)
+
+    return {"deleted": session_id, "files_removed": removed}
 
 
 @router.post("/{session_id}/garments")

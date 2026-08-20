@@ -529,6 +529,91 @@ class TestCreditDiscipline:
 
 
 # ==========================================================================
+# Deleting a session
+# ==========================================================================
+class TestSessionDelete:
+    def _two_sessions_sharing_a_source(self, tmp_path):
+        """Two sessions whose garments reference the same file, as the bundled
+        sample data does."""
+        from app.db import get_db
+        shared = _make_image(tmp_path / "shared.jpg")
+        mine = _make_image(tmp_path / "mine.jpg")
+        with get_db() as conn:
+            a = conn.execute("INSERT INTO sessions (name) VALUES ('a')").lastrowid
+            b = conn.execute("INSERT INTO sessions (name) VALUES ('b')").lastrowid
+            ga = conn.execute("INSERT INTO garments (session_id, name) VALUES (?,'g')",
+                              (a,)).lastrowid
+            gb = conn.execute("INSERT INTO garments (session_id, name) VALUES (?,'g')",
+                              (b,)).lastrowid
+            for gid, path in ((ga, shared), (ga, mine), (gb, shared)):
+                conn.execute(
+                    "INSERT INTO garment_images (garment_id, path, filename) VALUES (?,?,?)",
+                    (gid, str(path), path.name))
+        return a, b, shared, mine
+
+    def test_deleting_a_session_keeps_files_another_session_still_uses(
+            self, clean_db, tmp_path):
+        """The sample data is shared, so deletion must be reference-counted or it
+        pulls images out from under a session that is still using them."""
+        from app.routers.sessions import delete_session
+        a, _b, shared, mine = self._two_sessions_sharing_a_source(tmp_path)
+        delete_session(a)
+        assert shared.exists(), "a file another session references must survive"
+        assert not mine.exists(), "a file only this session used should be removed"
+
+    def test_models_and_lessons_survive_a_session_delete(self, clean_db):
+        """These are persistent by design and are what people fear losing."""
+        from app.core.lessons import record_fix_worked
+        from app.db import get_db
+        from app.routers.sessions import delete_session
+        with get_db() as conn:
+            conn.execute("INSERT INTO avatars (name, front_path) VALUES ('m','a.png')")
+            conn.execute("INSERT INTO look_templates (category, text) VALUES ('Tops','t')")
+            sid = conn.execute("INSERT INTO sessions (name) VALUES ('s')").lastrowid
+        record_fix_worked("Tops", "garment_color", "fix", "guidance")
+        delete_session(sid)
+        with get_db() as conn:
+            assert conn.execute("SELECT COUNT(*) FROM avatars").fetchone()[0] == 1
+            assert conn.execute("SELECT COUNT(*) FROM look_templates").fetchone()[0] == 1
+            assert conn.execute("SELECT COUNT(*) FROM qc_lessons").fetchone()[0] == 1
+
+    def test_preview_reports_what_would_be_lost(self, clean_db, tmp_path):
+        from app.db import get_db
+        from app.routers.sessions import deletion_preview
+        img = _make_image(tmp_path / "s.jpg")
+        with get_db() as conn:
+            sid = conn.execute("INSERT INTO sessions (name) VALUES ('s')").lastrowid
+            gid = conn.execute("INSERT INTO garments (session_id, name) VALUES (?,'g')",
+                               (sid,)).lastrowid
+            conn.execute("INSERT INTO garment_images (garment_id, path, filename) VALUES (?,?,?)",
+                         (gid, str(img), "s.jpg"))
+            lid = conn.execute("INSERT INTO looks (garment_id, label, text) VALUES (?,'L','t')",
+                               (gid,)).lastrowid
+            conn.execute("""INSERT INTO generations (look_id, garment_id, prompt, status)
+                            VALUES (?,?,'p','done')""", (lid, gid))
+        p = deletion_preview(sid)
+        assert p["garments"] == 1 and p["shots"] == 1 and p["looks"] == 1
+        assert p["bytes"] > 0
+
+    def test_rows_cascade(self, clean_db):
+        from app.db import get_db
+        from app.routers.sessions import delete_session
+        with get_db() as conn:
+            sid = conn.execute("INSERT INTO sessions (name) VALUES ('s')").lastrowid
+            gid = conn.execute("INSERT INTO garments (session_id, name) VALUES (?,'g')",
+                               (sid,)).lastrowid
+            lid = conn.execute("INSERT INTO looks (garment_id, label, text) VALUES (?,'L','t')",
+                               (gid,)).lastrowid
+            gen = conn.execute("""INSERT INTO generations (look_id, garment_id, prompt, status)
+                                  VALUES (?,?,'p','done')""", (lid, gid)).lastrowid
+            conn.execute("INSERT INTO qc_results (generation_id, overall_pass) VALUES (?,1)", (gen,))
+        delete_session(sid)
+        with get_db() as conn:
+            for table in ("garments", "looks", "generations", "qc_results", "garment_images"):
+                assert conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0, table
+
+
+# ==========================================================================
 # Persistence rules
 # ==========================================================================
 class TestPersistence:

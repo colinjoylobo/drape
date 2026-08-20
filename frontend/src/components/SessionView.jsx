@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, CATEGORIES, fileUrl } from "../api";
-import { Field, Lightbox, Modal, useAction } from "./common";
+import { DeleteSession, Field, Lightbox, Modal, useAction } from "./common";
 
 const SORTS = [
   { key: "added", label: "Date added" },
@@ -19,6 +19,7 @@ export default function SessionView({ sessionId, onBack, onOpenGarment }) {
   const [sort, setSort] = useState("added");
   const [selected, setSelected] = useState([]);
   const [adding, setAdding] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [busyIds, setBusyIds] = useState([]);
   const [notice, setNotice] = useState(null);
   const [lightbox, setLightbox] = useState(null);
@@ -135,6 +136,7 @@ export default function SessionView({ sessionId, onBack, onOpenGarment }) {
           <button className="btn primary" onClick={() => generate(null)}>Generate all</button>
           <a className="btn ghost" href={`/api/export/session/${sessionId}`} target="_blank"
              rel="noreferrer">Export</a>
+          <button className="btn ghost danger" onClick={() => setDeleting(true)}>Delete</button>
         </div>
       </div>
 
@@ -261,6 +263,10 @@ export default function SessionView({ sessionId, onBack, onOpenGarment }) {
       {adding && (
         <AddClothes sessionId={sessionId} onClose={() => setAdding(false)}
                     onDone={() => { setAdding(false); load(); }} />
+      )}
+      {deleting && (
+        <DeleteSession sessionId={sessionId} onClose={() => setDeleting(false)}
+                       onDeleted={onBack} />
       )}
       <Lightbox path={lightbox} onClose={() => setLightbox(null)} />
     </>
