@@ -164,6 +164,12 @@ cd backend && ./.venv/bin/python -m pytest tests -q
 surviving into a garment crop, coverage added to a complete set, a reference losing its role label, a
 lesson credited to the wrong criterion, a batch re-billing finished work.
 
+## Deploying
+
+Drape is built to run on one machine for one operator. Before it runs anywhere else, read
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — in particular that **there is no authentication**, and one
+of the endpoints spends money.
+
 ## Configuration
 
 All settings come from `backend/.env`, which is gitignored — see `.env.example` for the full list.
